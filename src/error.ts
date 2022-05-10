@@ -94,3 +94,11 @@ export class ReadOnlyPropertyError extends Error {
         this.name = ReadOnlyPropertyError.name;
     }
 }
+
+export class TalkbackNotSupportedError extends Error {
+    constructor(message?: string) {
+        super(message);
+        Object.setPrototypeOf(this, new.target.prototype);
+        this.name = TalkbackNotSupportedError.name;
+    }
+}

@@ -813,6 +813,12 @@ export class Device extends TypedEmitter<DeviceEvents> {
             sn.startsWith("T8124");
     }
 
+    static hasTalkbackFeature(sn: string): boolean {
+        // talkback is currently only tested with battery doorbell (T8210)
+        // to test other devices add them here
+        return sn.startsWith("T8210");
+    }
+
     public isCamera(): boolean {
         return Device.isCamera(this.rawDevice.device_type);
     }

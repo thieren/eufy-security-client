@@ -490,3 +490,7 @@ export const getAdvancedLockKey = (key: string, publicKey: string): string => {
 
     return Buffer.concat([Buffer.from(ecdh.getPublicKey("hex", "compressed"), "hex"), randomValue, encryptedData, hmacDigest]).toString("hex");
 }
+
+export const buildTalkbackPayload = (): Buffer => {
+    return Buffer.from([0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+}

@@ -14,7 +14,7 @@ import { ChargingType, CommandType, ErrorCode, ESLInnerCommand, P2PConnectionTyp
 import { Address, CmdCameraInfoResponse, CommandResult, ESLStationP2PThroughData, LockAdvancedOnOffRequestPayload, AdvancedLockSetParamsType, PropertyData } from "../p2p/models";
 import { Device, DoorbellCamera, Lock } from "./device";
 import { getAdvancedLockKey, encodeLockPayload, encryptLockAESData, generateBasicLockAESKey, generateAdvancedLockAESKey, getLockVectorBytes, isPrivateIp } from "../p2p/utils";
-import { InvalidCommandValueError, InvalidPropertyValueError, NotSupportedError, RTSPPropertyNotEnabled, WrongStationError } from "../error";
+import { InvalidCommandValueError, InvalidPropertyValueError, NotSupportedError, RTSPPropertyNotEnabled, WrongStationError, TalkbackNotSupportedError } from "../error";
 import { PushMessage } from "../push/models";
 import { CusPushEvent } from "../push/types";
 import { InvalidPropertyError, LivestreamAlreadyRunningError, LivestreamNotRunningError, PropertyNotSupportedError } from "./error";
@@ -2827,6 +2827,36 @@ export class Station extends TypedEmitter<StationEvents> {
             strValueSub: this.rawStation.member.admin_user_id,
             channel: device.getChannel()
         });
+    }
+
+    public startTalkback(device: Device): void {
+        if (device.getStationSerial() !== this.getSerial()) {
+            throw new WrongStationError(`Device ${device.getSerial()} is not managed by this station ${this.getSerial()}`);
+        }
+        if(!Device.hasTalkbackFeature(device.getSerial())) {
+            throw new TalkbackNotSupportedError(`Device ${device.getSerial()} seems to not have talckback capability or is not supported at the time.`);
+        }
+        if (!this.isLiveStreaming(device)) {
+            throw new LivestreamNotRunningError(`Livestream for device ${device.getSerial()} is not running`);
+        }
+        this.log.debug(`Sending start talkback command to station ${this.getSerial()} for device ${device.getSerial()}`);
+
+        this.p2pSession.sendStartTalkback();
+    }
+
+    public stopTalkback(device: Device): void {
+        if (device.getStationSerial() !== this.getSerial()) {
+            throw new WrongStationError(`Device ${device.getSerial()} is not managed by this station ${this.getSerial()}`);
+        }
+        if(!Device.hasTalkbackFeature(device.getSerial())) {
+            throw new TalkbackNotSupportedError(`Device ${device.getSerial()} seems to not have talckback capability or is not supported at the time.`);
+        }
+        if (!this.isLiveStreaming(device)) {
+            throw new LivestreamNotRunningError(`Livestream for device ${device.getSerial()} is not running`);
+        }
+        this.log.debug(`Sending stop talkback command to station ${this.getSerial()} for device ${device.getSerial()}`);
+
+        this.p2pSession.sendStopTalkback();
     }
 
     public async startLivestream(device: Device, videoCodec: VideoCodec = VideoCodec.H264): Promise<void> {
