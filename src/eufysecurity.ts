@@ -19,7 +19,7 @@ import { CommandResult } from "./p2p/models";
 import { generateSerialnumber, generateUDID, handleUpdate, md5, parseValue, removeLastChar } from "./utils";
 import { DeviceNotFoundError, DuplicateDeviceError, DuplicateStationError, StationNotFoundError, ReadOnlyPropertyError, NotSupportedError } from "./error";
 import { libVersion } from ".";
-import { InvalidPropertyError } from "./http/error";
+import { InvalidPropertyError, LivestreamNotRunningError } from "./http/error";
 import { ServerPushEvent } from "./push/types";
 import { MQTTService } from "./mqtt/service";
 import { TalkbackStream } from "./p2p/talkback";
@@ -677,6 +677,26 @@ export class EufySecurity extends TypedEmitter<EufySecurityEvents> {
         }
     }
 
+    public isTalkbackSupported(deviceSN: string): boolean {
+        return Device.hasTalkbackFeature(deviceSN);
+    }
+
+    public async startStationTalkback(deviceSN: string): Promise<void> {
+        const device = await this.getDevice(deviceSN);
+        const station = this.getStation(device.getStationSerial());
+
+        if (!Device.hasTalkbackFeature(deviceSN)) {
+            throw new NotSupportedError(`This functionality is not implemented or supported by ${device.getSerial()}`);
+        }
+
+        const camera = device as Camera;
+        if (!station.isLiveStreaming(camera)) {
+            throw new LivestreamNotRunningError(`Livestream for device ${device.getSerial()} is not running`);
+        }
+
+        station.startTalkback(camera);
+    }
+
     public async startCloudLivestream(deviceSN: string): Promise<void> {
         const device = await this.getDevice(deviceSN);
         const station = this.getStation(device.getStationSerial());
@@ -719,6 +739,22 @@ export class EufySecurity extends TypedEmitter<EufySecurityEvents> {
             clearTimeout(timeout);
             this.cameraStationLivestreamTimeout.delete(deviceSN);
         }
+    }
+
+    public async stopStationTalkback(deviceSN: string): Promise<void> {
+        const device = await this.getDevice(deviceSN);
+        const station = this.getStation(device.getStationSerial());
+
+        if (!Device.hasTalkbackFeature(deviceSN)) {
+            throw new NotSupportedError(`This functionality is not implemented or supported by ${device.getSerial()}`);
+        }
+
+        const camera = device as Camera;
+        if (!station.isLiveStreaming(camera)) {
+            throw new LivestreamNotRunningError(`Livestream for device ${device.getSerial()} is not running`);
+        }
+
+        station.stopTalkback(camera);
     }
 
     public async stopCloudLivestream(deviceSN: string): Promise<void> {
