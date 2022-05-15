@@ -204,8 +204,13 @@ export const hasHeader = (msg: Buffer, searchedType: Buffer): boolean => {
     return Buffer.compare(header, searchedType) === 0;
 };
 
-export const buildCommandHeader = (seqNumber: number, commandType: CommandType): Buffer => {
-    const dataTypeBuffer = P2PDataTypeHeader.DATA;
+export const buildCommandHeader = (seqNumber: number, commandType: CommandType, p2pDataTypeHeader: Buffer | null = null): Buffer => {
+    let dataTypeBuffer = P2PDataTypeHeader.DATA;
+    if(p2pDataTypeHeader !== null && (Buffer.compare(p2pDataTypeHeader, P2PDataTypeHeader.DATA) === 0 ||
+            Buffer.compare(p2pDataTypeHeader, P2PDataTypeHeader.BINARY) === 0 || Buffer.compare(p2pDataTypeHeader, P2PDataTypeHeader.CONTROL) === 0 ||
+            Buffer.compare(p2pDataTypeHeader, P2PDataTypeHeader.VIDEO) === 0)) {
+        dataTypeBuffer = p2pDataTypeHeader;
+    }
     const seqAsBuffer = Buffer.allocUnsafe(2);
     seqAsBuffer.writeUInt16BE(seqNumber, 0);
     const magicString = Buffer.from(MAGIC_WORD);
@@ -214,6 +219,32 @@ export const buildCommandHeader = (seqNumber: number, commandType: CommandType):
     return Buffer.concat([dataTypeBuffer, seqAsBuffer, magicString, commandTypeBuffer]);
 };
 
+export const buildTalkbackAudioFrameHeader = (seqNumber: number, audioData: Buffer): Buffer => {
+    const audioDataLength = Buffer.allocUnsafe(4);
+    audioDataLength.writeUInt32LE(audioData.length);
+    const unknown1 = Buffer.alloc(1);
+    const audioType = Buffer.alloc(1);
+    const audioSeq = Buffer.alloc(2);
+    const audioTimestamp = Buffer.alloc(6);
+    const unknown2 = Buffer.alloc(2);
+    const audioDataHeader = Buffer.concat([audioDataLength, unknown1, audioType, audioSeq, audioTimestamp, unknown2]);
+    const bytesToRead = Buffer.allocUnsafe(4);
+    bytesToRead.writeUInt32LE(audioData.length + audioDataHeader.length);
+    const unknown3 = Buffer.from([0x01, 0x00]);
+    const channel = Buffer.alloc(1);
+    const signcode = Buffer.alloc(1);
+    const type = Buffer.alloc(1);
+    return Buffer.concat([
+        buildCommandHeader(seqNumber, CommandType.CMD_AUDIO_FRAME, P2PDataTypeHeader.VIDEO),
+        bytesToRead,
+        unknown3,
+        channel,
+        signcode,
+        type,
+        unknown1,
+        audioDataHeader
+    ]);
+}
 
 export const buildCommandWithStringTypePayload = (value: string, channel = 0): Buffer => {
     // type = 6

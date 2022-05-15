@@ -19,6 +19,7 @@ import { PushMessage } from "../push/models";
 import { CusPushEvent } from "../push/types";
 import { InvalidPropertyError, LivestreamAlreadyRunningError, LivestreamNotRunningError, PropertyNotSupportedError } from "./error";
 import { validValue } from "../utils";
+import { TalkbackStream } from "../p2p/talkback";
 
 export class Station extends TypedEmitter<StationEvents> {
 
@@ -64,6 +65,8 @@ export class Station extends TypedEmitter<StationEvents> {
         this.p2pSession.on("runtime state", (channel: number, batteryLevel: number, temperature: number) => this.onRuntimeState(channel, batteryLevel, temperature));
         this.p2pSession.on("charging state", (channel: number, chargeType: ChargingType, batteryLevel: number) => this.onChargingState(channel, chargeType, batteryLevel));
         this.p2pSession.on("floodlight manual switch", (channel: number, enabled: boolean) => this.onFloodlightManualSwitch(channel, enabled));
+        this.p2pSession.on("talkback started", (talkbackStream: TalkbackStream) => this.onTalkbackStarted(talkbackStream));
+        this.p2pSession.on("talkback stopped", () => this.onTalkbackStopped());
         this.update(this.rawStation);
         this.ready = true;
         setImmediate(() => {
@@ -5028,6 +5031,14 @@ export class Station extends TypedEmitter<StationEvents> {
             }),
             channel: device.getChannel()
         }, propertyData);
+    }
+
+    private onTalkbackStarted(talkbackStream: TalkbackStream): void {
+        this.emit("talkback started", this, talkbackStream);
+    }
+
+    private onTalkbackStopped(): void {
+        this.emit("talkback stopped", this);
     }
 
 }

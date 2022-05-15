@@ -8,6 +8,7 @@ import { Camera, Device } from "./device";
 import { Cipher, Voice, Invite, DeviceListResponse, StationListResponse, HouseListResponse } from "./models";
 import { Station } from "./station";
 import { CommandName, PropertyName } from "./types";
+import { TalkbackStream } from "../p2p/talkback";
 
 export type PropertyValue = number | boolean | string;
 
@@ -166,6 +167,8 @@ export interface StationEvents {
     "charging state": (station: Station, channel: number, chargeType: ChargingType, batteryLevel: number) => void;
     "wifi rssi": (station: Station, channel: number, rssi: number) => void;
     "floodlight manual switch": (station: Station, channel: number, enabled: boolean) => void;
+    "talkback started": (station: Station, talkbackStream: TalkbackStream) => void;
+    "talkback stopped": (station: Station) => void;
 }
 
 export interface DeviceEvents {

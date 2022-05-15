@@ -6,7 +6,7 @@ import { Logger } from "ts-log";
 import { SortedMap } from "sweet-collections";
 
 import { Address, CmdCameraInfoResponse, CmdNotifyPayload, CommandResult, ESLAdvancedLockStatusNotification, PropertyData, ESLStationP2PThroughData } from "./models";
-import { sendMessage, hasHeader, buildCheckCamPayload, buildIntCommandPayload, buildIntStringCommandPayload, buildCommandHeader, MAGIC_WORD, buildCommandWithStringTypePayload, isPrivateIp, buildLookupWithKeyPayload, sortP2PMessageParts, buildStringTypeCommandPayload, getRSAPrivateKey, decryptAESData, getNewRSAPrivateKey, findStartCode, isIFrame, generateLockSequence, decodeLockPayload, generateBasicLockAESKey, getLockVectorBytes, decryptLockAESData, buildLookupWithKeyPayload2, buildCheckCamPayload2, buildLookupWithKeyPayload3, decodeBase64, getVideoCodec, checkT8420, buildVoidCommandPayload, isP2PQueueMessage, buildTalkbackPayload } from "./utils";
+import { sendMessage, hasHeader, buildCheckCamPayload, buildIntCommandPayload, buildIntStringCommandPayload, buildCommandHeader, MAGIC_WORD, buildCommandWithStringTypePayload, isPrivateIp, buildLookupWithKeyPayload, sortP2PMessageParts, buildStringTypeCommandPayload, getRSAPrivateKey, decryptAESData, getNewRSAPrivateKey, findStartCode, isIFrame, generateLockSequence, decodeLockPayload, generateBasicLockAESKey, getLockVectorBytes, decryptLockAESData, buildLookupWithKeyPayload2, buildCheckCamPayload2, buildLookupWithKeyPayload3, decodeBase64, getVideoCodec, checkT8420, buildVoidCommandPayload, isP2PQueueMessage, buildTalkbackPayload, buildTalkbackAudioFrameHeader } from "./utils";
 import { RequestMessageType, ResponseMessageType, CommandType, ErrorCode, P2PDataType, P2PDataTypeHeader, AudioCodec, VideoCodec, ESLInnerCommand, P2PConnectionType, ChargingType } from "./types";
 import { AlarmMode } from "../http/types";
 import { P2PDataMessage, P2PDataMessageAudio, P2PDataMessageBuilder, P2PMessageState, P2PDataMessageVideo, P2PMessage, P2PDataHeader, P2PDataMessageState, P2PClientProtocolEvents, DeviceSerial, P2PQueueMessage, P2PCommand } from "./interfaces";
@@ -14,6 +14,7 @@ import { DskKeyResponse, ResultResponse, StationListResponse } from "../http/mod
 import { HTTPApi } from "../http/api";
 import { Device } from "../http/device";
 import { getAdvancedLockTimezone } from "../http/utils";
+import { TalkbackStream } from "./talkback";
 
 export class P2PClientProtocol extends TypedEmitter<P2PClientProtocolEvents> {
 
@@ -44,6 +45,9 @@ export class P2PClientProtocol extends TypedEmitter<P2PClientProtocolEvents> {
     private connected = false;
     private connecting = false;
     private terminating = false;
+
+    private talkbackStream = new TalkbackStream();
+    private talkbackSeqNumber = 0;
 
     private seqNumber = 0;
     private lockSeqNumber = -1;
@@ -108,6 +112,11 @@ export class P2PClientProtocol extends TypedEmitter<P2PClientProtocolEvents> {
         this.socket.on("error", (error) => this.onError(error));
         this.socket.on("close", () => this.onClose());
 
+        this.talkbackStream = new TalkbackStream();
+        this.talkbackStream.on("data", (audioData) => { this.sendTalkbackAudioFrame(audioData) });
+        this.talkbackStream.on("error", (error) => { this.onTalkbackStreamError(error) });
+        this.talkbackStream.on("close", () => this.onTalkbackStreamClose());
+
         this._initialize();
     }
 
@@ -128,6 +137,7 @@ export class P2PClientProtocol extends TypedEmitter<P2PClientProtocolEvents> {
         this.energySavingDeviceP2PDataSeqNumber = 0;
         this.lockSeqNumber = -1;
         this.connectAddress = undefined;
+        this.talkbackSeqNumber = 0;
 
         this._clearMessageStateTimeouts();
         this.messageStates.clear();
@@ -625,6 +635,20 @@ export class P2PClientProtocol extends TypedEmitter<P2PClientProtocolEvents> {
         }
     }
 
+    private sendTalkbackAudioFrame(audioData: Buffer): void {
+        // TODO for now all frames are sent twice in sequence
+        // compensation for loss due to network instability would have to be implemented
+        const messageHeader = buildTalkbackAudioFrameHeader(this.talkbackSeqNumber, audioData);
+        const messageData = Buffer.concat([messageHeader, audioData]);
+        this.talkbackSeqNumber++;
+        sendMessage(this.socket, this.connectAddress!, RequestMessageType.DATA, messageData).catch((error) => {
+            this.log.error(`Station ${this.rawStation.station_sn} - Error:`, error);
+        });
+        sendMessage(this.socket, this.connectAddress!, RequestMessageType.DATA, messageData).catch((error) => {
+            this.log.error(`Station ${this.rawStation.station_sn} - Error:`, error);
+        });
+    }
+
     private handleMsg(msg: Buffer, rinfo: RemoteInfo): void {
         if (hasHeader(msg, ResponseMessageType.LOOKUP_ADDR)) {
             const port = msg.slice(6, 8).readUInt16LE();
@@ -1021,6 +1045,12 @@ export class P2PClientProtocol extends TypedEmitter<P2PClientProtocolEvents> {
                                 this.waitForStreamData(P2PDataType.VIDEO);
                             } else if (msg_state.commandType === CommandType.CMD_DOWNLOAD_VIDEO) {
                                 this.waitForStreamData(P2PDataType.BINARY);
+                            } else if (msg_state.commandType === CommandType.CMD_START_TALKBACK) {
+                                this.talkbackStream.startTalkback();
+                                this.emit("talkback started", this.talkbackStream);
+                            } else if (msg_state.commandType === CommandType.CMD_STOP_TALKBACK) {
+                                this.talkbackStream.stopTalkback();
+                                this.emit("talkback stopped");
                             }
                         }
                     } else {
@@ -1454,6 +1484,18 @@ export class P2PClientProtocol extends TypedEmitter<P2PClientProtocolEvents> {
 
     private onError(error: any): void {
         this.log.debug(`Station ${this.rawStation.station_sn} - Error:`, error);
+    }
+
+    private onTalkbackStreamClose(): void {
+        this.talkbackStream.removeAllListeners();
+        this.talkbackStream = new TalkbackStream();
+        this.talkbackStream.on("data", (audioData) => { this.sendTalkbackAudioFrame(audioData) });
+        this.talkbackStream.on("error", (error) => { this.onTalkbackStreamError(error) });
+        this.talkbackStream.on("close", () => { this.onTalkbackStreamClose() });
+    }
+
+    private onTalkbackStreamError(error: any): void {
+        this.log.debug(`Station ${this.rawStation.station_sn} - Talkback Error:`, error);
     }
 
     private scheduleHeartbeat(): void {

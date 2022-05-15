@@ -22,6 +22,7 @@ import { libVersion } from ".";
 import { InvalidPropertyError } from "./http/error";
 import { ServerPushEvent } from "./push/types";
 import { MQTTService } from "./mqtt/service";
+import { TalkbackStream } from "./p2p/talkback";
 
 export class EufySecurity extends TypedEmitter<EufySecurityEvents> {
 
@@ -408,6 +409,8 @@ export class EufySecurity extends TypedEmitter<EufySecurityEvents> {
                 station.on("charging state", (station: Station, channel: number, chargeType: ChargingType, batteryLevel: number) => this.onStationChargingState(station, channel, chargeType, batteryLevel));
                 station.on("wifi rssi", (station: Station, channel: number, rssi: number) => this.onStationWifiRssi(station, channel, rssi));
                 station.on("floodlight manual switch", (station: Station, channel: number, enabled: boolean) => this.onFloodlightManualSwitch(station, channel, enabled));
+                station.on("talkback started", (station: Station, talkbackStream: TalkbackStream) => this.onStationTalkbackStart(station, talkbackStream));
+                station.on("talkback stopped", (station) => this.onStationTalkbackStop(station));
 
                 this.addStation(station);
             }
@@ -1566,6 +1569,14 @@ export class EufySecurity extends TypedEmitter<EufySecurityEvents> {
         }).catch((error) => {
             this.log.error(`Station wifi rssi error (station: ${station.getSerial()} channel: ${channel})`, error);
         });
+    }
+
+    private onStationTalkbackStart(station: Station, talkbackStream: TalkbackStream): void {
+        this.emit("station talkback start", station, talkbackStream);
+    }
+
+    private onStationTalkbackStop(station: Station): void {
+        this.emit("station talkback stop", station);
     }
 
     private onCaptchaRequest(id: string, captcha: string): void {
