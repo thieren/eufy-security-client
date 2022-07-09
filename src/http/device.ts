@@ -1819,8 +1819,11 @@ export class Lock extends Device {
     protected processCustomParameterChanged(metadata: PropertyMetadataAny, oldValue: PropertyValue, newValue: PropertyValue): void {
         super.processCustomParameterChanged(metadata, oldValue, newValue);
         if ((metadata.key === CommandType.CMD_DOORLOCK_GET_STATE || metadata.key === CommandType.CMD_SMARTLOCK_QUERY_STATUS) && ((oldValue !== undefined && ((oldValue === 4 && newValue !== 4) || (oldValue !== 4 && newValue === 4))) || oldValue === undefined)) {
-            if (this.updateProperty(PropertyName.DeviceLocked, newValue === 4 ? true : false))
+            if (this.updateProperty(PropertyName.DeviceLocked, newValue === 4 ? true : false)) {
+                this.log.info('emitted locked from processCustomParameterChanged');
+                this.log.info('newValue: ' + newValue + ' oldValue: ' + oldValue);
                 this.emit("locked", this as unknown as Lock, newValue === 4 ? true : false);
+            }
         }
     }
 
@@ -1917,6 +1920,8 @@ export class Lock extends Device {
                     {
                         const cmdType = this.isLockBle() || this.isLockBleNoFinger() ? CommandType.CMD_DOORLOCK_GET_STATE : CommandType.CMD_SMARTLOCK_QUERY_STATUS;
                         this.updateRawProperty(cmdType, "4");
+                        this.log.info('emitted locked from processNotification with cmdType: ' + cmdType + ' value: 4');
+                        this.log.info('rawProperty: ' + this.getRawProperty(cmdType) + ' propertyValue: ' + this.getPropertyValue(PropertyName.DeviceLocked));
                         this.emit("locked", this, this.getPropertyValue(PropertyName.DeviceLocked) as boolean);
                         break;
                     }
@@ -1929,6 +1934,8 @@ export class Lock extends Device {
                     {
                         const cmdType = this.isLockBle() || this.isLockBleNoFinger() ? CommandType.CMD_DOORLOCK_GET_STATE : CommandType.CMD_SMARTLOCK_QUERY_STATUS;
                         this.updateRawProperty(cmdType, "3");
+                        this.log.info('emitted locked from processNotification with cmdType: ' + cmdType + ' value: 3');
+                        this.log.info('rawProperty: ' + this.getRawProperty(cmdType) + ' propertyValue: ' + this.getPropertyValue(PropertyName.DeviceLocked));
                         this.emit("locked", this, this.getPropertyValue(PropertyName.DeviceLocked) as boolean);
                         break;
                     }
@@ -1939,6 +1946,8 @@ export class Lock extends Device {
                     {
                         const cmdType = this.isLockBle() || this.isLockBleNoFinger() ? CommandType.CMD_DOORLOCK_GET_STATE : CommandType.CMD_SMARTLOCK_QUERY_STATUS;
                         this.updateRawProperty(cmdType, "5");
+                        this.log.info('no emitted locked from processNotification with cmdType: ' + cmdType + ' value: 5');
+                        this.log.info('rawProperty: ' + this.getRawProperty(cmdType) + ' propertyValue: ' + this.getPropertyValue(PropertyName.DeviceLocked));
                         break;
                     }
                     // case LockPushEvent.LOW_POWE:
