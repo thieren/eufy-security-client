@@ -1875,10 +1875,12 @@ export class Lock extends Device {
         try {
             if (property.key === CommandType.CMD_DOORLOCK_GET_STATE) {
                 switch (value) {
-                    case "3":
-                        return false;
-                    case "4":
-                        return true;
+                  case "3":
+                    return 3;
+                  case "4":
+                    return 4;
+                  case "5":
+                    return 5;
                 }
             }
         } catch (error) {
@@ -1920,6 +1922,7 @@ export class Lock extends Device {
                     {
                         const cmdType = this.isLockBle() || this.isLockBleNoFinger() ? CommandType.CMD_DOORLOCK_GET_STATE : CommandType.CMD_SMARTLOCK_QUERY_STATUS;
                         this.updateRawProperty(cmdType, "4");
+                        this.updateProperty(PropertyName.DeviceLocked, true);
                         this.log.info('emitted locked from processNotification with cmdType: ' + cmdType + ' value: 4');
                         this.log.info('rawProperty: ' + this.getRawProperty(cmdType) + ' propertyValue: ' + this.getPropertyValue(PropertyName.DeviceLocked));
                         this.emit("locked", this, this.getPropertyValue(PropertyName.DeviceLocked) as boolean);
@@ -1934,6 +1937,7 @@ export class Lock extends Device {
                     {
                         const cmdType = this.isLockBle() || this.isLockBleNoFinger() ? CommandType.CMD_DOORLOCK_GET_STATE : CommandType.CMD_SMARTLOCK_QUERY_STATUS;
                         this.updateRawProperty(cmdType, "3");
+                        this.updateProperty(PropertyName.DeviceLocked, false);
                         this.log.info('emitted locked from processNotification with cmdType: ' + cmdType + ' value: 3');
                         this.log.info('rawProperty: ' + this.getRawProperty(cmdType) + ' propertyValue: ' + this.getPropertyValue(PropertyName.DeviceLocked));
                         this.emit("locked", this, this.getPropertyValue(PropertyName.DeviceLocked) as boolean);
@@ -1946,6 +1950,7 @@ export class Lock extends Device {
                     {
                         const cmdType = this.isLockBle() || this.isLockBleNoFinger() ? CommandType.CMD_DOORLOCK_GET_STATE : CommandType.CMD_SMARTLOCK_QUERY_STATUS;
                         this.updateRawProperty(cmdType, "5");
+                        this.updateProperty(PropertyName.DeviceLocked, false);
                         this.log.info('no emitted locked from processNotification with cmdType: ' + cmdType + ' value: 5');
                         this.log.info('rawProperty: ' + this.getRawProperty(cmdType) + ' propertyValue: ' + this.getPropertyValue(PropertyName.DeviceLocked));
                         break;
